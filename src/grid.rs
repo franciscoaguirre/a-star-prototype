@@ -1,23 +1,31 @@
 use bevy::prelude::*;
 use bevy_mod_picking::*;
 
-pub const GRID_HEIGHT: u32 = 10;
-pub const GRID_WIDTH: u32 = 10;
+pub const GRID_HEIGHT: i32 = 10;
+pub const GRID_WIDTH: i32 = 10;
 pub const TILE_SIZE: f32 = 1.0;
 
 pub struct GridPlugin;
 impl Plugin for GridPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.init_resource::<SquareMaterials>()
+            .init_resource::<SelectedSquare>()
             .add_startup_system(create_grid.system())
-            .add_system(color_squares.system());
+            .add_system(color_squares.system())
+            .add_system(select_square.system());
     }
+}
+
+#[derive(Default)]
+pub struct SelectedSquare {
+    pub x: i32,
+    pub y: i32,
 }
 
 #[derive(Debug)]
 pub struct Square {
-    pub x: u32,
-    pub y: u32,
+    pub x: i32,
+    pub y: i32,
 }
 
 impl Square {
@@ -93,5 +101,30 @@ fn color_squares(
         } else {
             materials.black_color.clone()
         };
+    }
+}
+
+fn select_square(
+    pick_state: Res<PickState>,
+    mouse_button_inputs: Res<Input<MouseButton>>,
+    mut selected_square: ResMut<SelectedSquare>,
+    squares_query: Query<&Square>,
+) {
+    // Only run if the left button is pressed
+    if !mouse_button_inputs.just_pressed(MouseButton::Left) {
+        return;
+    }
+    // Get the square under the cursor and set it as the selected
+    if let Some((square_entity, _intersection)) = pick_state.top(Group::default()) {
+        // Get the actual square. This ensures it exists and is a square. Not really needed
+        if let Ok(square) = squares_query.get(*square_entity) {
+            // Mark it as selected
+            selected_square.x = square.x;
+            selected_square.y = square.y;
+        }
+    } else {
+        // Player clicked outside the board, deselect everything
+        selected_square.x = 0;
+        selected_square.y = 0;
     }
 }

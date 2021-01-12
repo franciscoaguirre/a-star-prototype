@@ -4,12 +4,22 @@ use bevy_mod_picking::*;
 mod grid;
 use grid::*;
 
+mod pathfinding;
+use pathfinding::PathfindingPlugin;
+
+pub struct Player {
+    // Grid location
+    pub x: i8,
+    pub y: i8,
+}
+
 fn main() {
     App::build()
         .add_resource(Msaa { samples: 4 })
         .add_plugins(DefaultPlugins)
         .add_plugin(PickingPlugin)
         .add_plugin(GridPlugin)
+        .add_plugin(PathfindingPlugin)
         .add_startup_system(setup.system())
         .run();
 }
@@ -33,7 +43,7 @@ fn setup(
             material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
             transform: Transform::from_translation(Vec3::new(0.0, 0.5, 0.0)),
             ..Default::default()
-        })
+        }).with(Player{x: 0, y: 0})
         // light
         .spawn(LightBundle {
             transform: Transform::from_translation(Vec3::new(4.0, 8.0, 4.0)),
