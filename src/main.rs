@@ -7,12 +7,8 @@ use grid::*;
 mod pathfinding;
 use pathfinding::PathfindingPlugin;
 
-pub struct Player {
-    // Grid location
-    pub x: i8,
-    pub y: i8,
-}
-
+mod player;
+use player::PlayerPlugin;
 fn main() {
     App::build()
         .add_resource(Msaa { samples: 4 })
@@ -20,14 +16,13 @@ fn main() {
         .add_plugin(PickingPlugin)
         .add_plugin(GridPlugin)
         .add_plugin(PathfindingPlugin)
+        .add_plugin(PlayerPlugin)
         .add_startup_system(setup.system())
         .run();
 }
 
 fn setup(
-    commands: &mut Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    commands: &mut Commands
 ) {
     let camera_translation = Vec3::new(
         GRID_WIDTH as f32 * TILE_SIZE * 0.5,
@@ -37,13 +32,6 @@ fn setup(
 
     // add entities to the world
     commands
-        // cube
-        .spawn(PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
-            material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
-            transform: Transform::from_translation(Vec3::new(0.0, 0.5, 0.0)),
-            ..Default::default()
-        }).with(Player{x: 0, y: 0})
         // light
         .spawn(LightBundle {
             transform: Transform::from_translation(Vec3::new(4.0, 8.0, 4.0)),

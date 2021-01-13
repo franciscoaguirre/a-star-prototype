@@ -10,10 +10,16 @@ impl Plugin for GridPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.init_resource::<SquareMaterials>()
             .init_resource::<SelectedSquare>()
+            .init_resource::<SelectedPath>()
             .add_startup_system(create_grid.system())
             .add_system(color_squares.system())
             .add_system(select_square.system());
     }
+}
+
+#[derive(Default)]
+pub struct SelectedPath {
+    pub squares: Vec<(i32, i32)>,
 }
 
 #[derive(Default)]
@@ -38,14 +44,18 @@ struct SquareMaterials {
     highlight_color: Handle<StandardMaterial>,
     black_color: Handle<StandardMaterial>,
     white_color: Handle<StandardMaterial>,
+    path_color_dark: Handle<StandardMaterial>,
+    path_color_light: Handle<StandardMaterial>,
 }
 impl FromResources for SquareMaterials {
     fn from_resources(resources: &Resources) -> Self {
         let mut materials = resources.get_mut::<Assets<StandardMaterial>>().unwrap();
         SquareMaterials {
-            highlight_color: materials.add(Color::rgb(0.8, 0.3, 0.3).into()),
+            highlight_color: materials.add(Color::RED.into()),
             black_color: materials.add(Color::BLACK.into()),
             white_color: materials.add(Color::WHITE.into()),
+            path_color_dark: materials.add(Color::rgb(0., 0. , 1.).into()),
+            path_color_light: materials.add(Color::rgb(0., 0.33, 1.).into()),
         }
     }
 }
@@ -68,9 +78,9 @@ fn create_grid(
                     mesh: meshes.add(Mesh::from(shape::Plane { size: TILE_SIZE })),
                     material,
                     transform: Transform::from_translation(Vec3::new(
-                        column as f32,
-                        0.,
                         row as f32,
+                        0.,
+                        column as f32,
                     )),
                     ..Default::default()
                 })
@@ -83,6 +93,7 @@ fn create_grid(
 fn color_squares(
     pick_state: Res<PickState>,
     materials: Res<SquareMaterials>,
+    selected_path: Res<SelectedPath>,
     mut query: Query<(Entity, &Square, &mut Handle<StandardMaterial>)>,
 ) {
     // Get entity under the cursor, if there is one
@@ -94,8 +105,14 @@ fn color_squares(
 
     for (entity, square, mut material) in query.iter_mut() {
         // Change the material
+        let contained = selected_path.squares.contains(&(square.x, square.y));
+
         *material = if Some(entity) == top_entity {
             materials.highlight_color.clone()
+        } else if contained && square.is_white() {
+            materials.path_color_light.clone()
+        } else if contained {
+            materials.path_color_dark.clone()
         } else if square.is_white() {
             materials.white_color.clone()
         } else {

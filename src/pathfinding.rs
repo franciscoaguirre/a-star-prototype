@@ -1,9 +1,9 @@
 use bevy::prelude::*;
 use priority_queue::PriorityQueue;
 
-use crate::{SelectedSquare, Square, Player};
+use crate::{SelectedSquare, SelectedPath, player::Player};
 
-use std::collections::HashMap;
+use std::{collections::HashMap};
 use std::cmp::Reverse;
 
 const EDGE_COST: i32 = 1;
@@ -15,10 +15,8 @@ impl Plugin for PathfindingPlugin {
         app.init_resource::<Frontier>()
             .init_resource::<CameFrom>()
             .init_resource::<CurrentCosts>()
-            .add_startup_system(a_start_setup.system())
-            .add_system(a_star_finder.system())
-            // .add_system(print_came_from.system())
-            .add_system(a_start_initializer.system());
+            .add_startup_system(a_star_setup.system())
+            .add_system(a_star_initializer.system());
     }
 }
 
@@ -31,44 +29,46 @@ struct CameFrom(HashMap<(i32, i32), Option<(i32, i32)>>);
 #[derive(Default)]
 struct CurrentCosts(HashMap<(i32, i32), i32>);
 
-fn a_start_initializer(
-    mut frontier: ResMut<Frontier>,
-    mut came_from: ResMut<CameFrom>,
-    mut current_costs: ResMut<CurrentCosts>,
-    _selected_square: ChangedRes<SelectedSquare>
-) {
-    frontier.0.clear();
-    came_from.0.clear();
-    current_costs.0.clear();
-
-    frontier.0.push((0, 0), Reverse(0));
-    came_from.0.insert((0, 0), None);
-    current_costs.0.insert((0, 0), 0);
-}
-
-fn a_star_finder(
+fn a_star_initializer(
     mut frontier: ResMut<Frontier>,
     mut came_from: ResMut<CameFrom>,
     mut current_costs: ResMut<CurrentCosts>,
     mut player_transform_query: Query<&mut Transform, With<Player>>,
-    selected_square: Res<SelectedSquare>,
+    mut selected_path: ResMut<SelectedPath>,
+    selected_square: ChangedRes<SelectedSquare>
 ) {
-    if frontier.0.is_empty() {
-        return;
+    for transform in player_transform_query.iter_mut() {
+        frontier.0.clear();
+        came_from.0.clear();
+        current_costs.0.clear();
+
+        let player_position = (transform.translation.x.round() as i32, transform.translation.z.round() as i32);
+        frontier.0.push(player_position, Reverse(0));
+        came_from.0.insert(player_position, None);
+        current_costs.0.insert(player_position, 0);
+
+        create_path(&mut frontier, &mut came_from, &mut  current_costs, &mut selected_path, player_position, &selected_square)
     }
+}
 
-    let current = frontier.0.pop().unwrap().0;
+fn create_path(
+    frontier: &mut ResMut<Frontier>,
+    came_from: &mut ResMut<CameFrom>,
+    current_costs: &mut ResMut<CurrentCosts>,
+    selected_path: &mut ResMut<SelectedPath>,
+    source: (i32, i32),
+    selected_square: &ChangedRes<SelectedSquare>,
+) {
+    while !frontier.0.is_empty() {
+        let current = frontier.0.pop().unwrap().0;
 
-    for mut player_transform in player_transform_query.iter_mut() {
         let (goal_x, goal_y) = (selected_square.x, selected_square.y);
         if current == (goal_x, goal_y) {
-            paint_path(&mut came_from, current);
+            select_path(came_from, source, selected_path, current);
             frontier.0.clear();
             break;
         }
 
-
-        // println!("Picked x: {:?}, y: {:?}, goal is: {:?}, {:?}", current.0, current.1, goal_x, goal_y);
         for (x, y) in adjacents(current) {
             let new_cost = current_costs.0[&current] + EDGE_COST;
 
@@ -82,11 +82,12 @@ fn a_star_finder(
     }
 }
 
-fn paint_path(came_from: &mut ResMut<CameFrom>, goal: (i32, i32)) {
+fn select_path(came_from: &mut ResMut<CameFrom>, source: (i32, i32), selected_path: &mut ResMut<SelectedPath>, goal: (i32, i32)) {
     let mut current_square = goal;
-    let mut path = vec![];
-    while current_square != (0, 0) {
-        path.push(current_square);
+    selected_path.squares.clear();
+
+    while current_square != source {
+        selected_path.squares.push(current_square);
 
         if came_from.0[&current_square] == None {
             println!("Did not found path");
@@ -95,12 +96,6 @@ fn paint_path(came_from: &mut ResMut<CameFrom>, goal: (i32, i32)) {
 
         current_square = came_from.0[&current_square].unwrap();
     }
-
-    println!("{:?}", path);
-}
-
-fn print_came_from(came_from: ChangedRes<CameFrom>) {
-    println!("{:?}", came_from);
 }
 
 fn adjacents(square: (i32, i32)) -> Vec<(i32, i32)> {
@@ -116,7 +111,7 @@ fn heuristic(goal: (i32, i32), next_step: (i32, i32)) -> i32 {
     (((goal.0 - next_step.0).abs() + (goal.1 - next_step.1).abs()) as f32).sqrt() as i32
 }
 
-fn a_start_setup(
+fn a_star_setup(
     mut frontier: ResMut<Frontier>,
     mut came_from: ResMut<CameFrom>,
     mut current_costs: ResMut<CurrentCosts>
