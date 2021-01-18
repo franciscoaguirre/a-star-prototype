@@ -1,10 +1,10 @@
 use bevy::prelude::*;
 use priority_queue::PriorityQueue;
 
-use crate::{SelectedSquare, SelectedPath, player::Player};
+use crate::{player::Player, SelectedPath, SelectedSquare};
 
-use std::{collections::HashMap};
 use std::cmp::Reverse;
+use std::collections::HashMap;
 
 const EDGE_COST: i32 = 1;
 
@@ -35,19 +35,29 @@ fn a_star_initializer(
     mut current_costs: ResMut<CurrentCosts>,
     mut player_transform_query: Query<&mut Transform, With<Player>>,
     mut selected_path: ResMut<SelectedPath>,
-    selected_square: ChangedRes<SelectedSquare>
+    selected_square: ChangedRes<SelectedSquare>,
 ) {
     for transform in player_transform_query.iter_mut() {
         frontier.0.clear();
         came_from.0.clear();
         current_costs.0.clear();
 
-        let player_position = (transform.translation.x.round() as i32, transform.translation.z.round() as i32);
+        let player_position = (
+            transform.translation.x.round() as i32,
+            transform.translation.z.round() as i32,
+        );
         frontier.0.push(player_position, Reverse(0));
         came_from.0.insert(player_position, None);
         current_costs.0.insert(player_position, 0);
 
-        create_path(&mut frontier, &mut came_from, &mut  current_costs, &mut selected_path, player_position, &selected_square)
+        create_path(
+            &mut frontier,
+            &mut came_from,
+            &mut current_costs,
+            &mut selected_path,
+            player_position,
+            &selected_square,
+        )
     }
 }
 
@@ -82,7 +92,12 @@ fn create_path(
     }
 }
 
-fn select_path(came_from: &mut ResMut<CameFrom>, source: (i32, i32), selected_path: &mut ResMut<SelectedPath>, goal: (i32, i32)) {
+fn select_path(
+    came_from: &mut ResMut<CameFrom>,
+    source: (i32, i32),
+    selected_path: &mut ResMut<SelectedPath>,
+    goal: (i32, i32),
+) {
     let mut current_square = goal;
     selected_path.squares.clear();
 
@@ -103,18 +118,20 @@ fn adjacents(square: (i32, i32)) -> Vec<(i32, i32)> {
         (square.0, square.1 + 1),
         (square.0, square.1 - 1),
         (square.0 + 1, square.1),
-        (square.0 - 1, square.1)
+        (square.0 - 1, square.1),
     ]
 }
 
 fn heuristic(goal: (i32, i32), next_step: (i32, i32)) -> i32 {
-    (((goal.0 - next_step.0).abs() + (goal.1 - next_step.1).abs()) as f32).sqrt() as i32
+    // (((goal.0 - next_step.0).abs() + (goal.1 - next_step.1).abs()) as f32).sqrt() as i32
+    // Change heurisitc specific for grid
+    (goal.0 - next_step.0).abs() + (goal.1 - next_step.1).abs()
 }
 
 fn a_star_setup(
     mut frontier: ResMut<Frontier>,
     mut came_from: ResMut<CameFrom>,
-    mut current_costs: ResMut<CurrentCosts>
+    mut current_costs: ResMut<CurrentCosts>,
 ) {
     frontier.0.push((0, 0), Reverse(0));
     came_from.0.insert((0, 0), None);
