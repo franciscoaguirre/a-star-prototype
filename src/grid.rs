@@ -32,6 +32,7 @@ pub struct SelectedSquare {
 pub struct Square {
     pub x: i32,
     pub y: i32,
+    pub obstructed: bool,
 }
 
 impl Square {
@@ -54,7 +55,7 @@ impl FromResources for SquareMaterials {
             highlight_color: materials.add(Color::RED.into()),
             black_color: materials.add(Color::BLACK.into()),
             white_color: materials.add(Color::WHITE.into()),
-            path_color_dark: materials.add(Color::rgb(0., 0. , 1.).into()),
+            path_color_dark: materials.add(Color::rgb(0., 0., 1.).into()),
             path_color_light: materials.add(Color::rgb(0., 0.33, 1.).into()),
         }
     }
