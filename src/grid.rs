@@ -13,7 +13,8 @@ impl Plugin for GridPlugin {
             .init_resource::<SelectedPath>()
             .add_startup_system(create_grid.system())
             .add_system(color_squares.system())
-            .add_system(select_square.system());
+            .add_system(select_square.system())
+            .add_system(place_wall.system());
     }
 }
 
@@ -28,7 +29,7 @@ pub struct SelectedSquare {
     pub y: i32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Square {
     pub x: i32,
     pub y: i32,
@@ -85,7 +86,11 @@ fn create_grid(
                     )),
                     ..Default::default()
                 })
-                .with(Square { x: row, y: column })
+                .with(Square {
+                    x: row,
+                    y: column,
+                    ..Default::default()
+                })
                 .with(PickableMesh::default());
         }
     }
@@ -144,5 +149,33 @@ fn select_square(
         // Player clicked outside the board, deselect everything
         selected_square.x = 0;
         selected_square.y = 0;
+    }
+}
+
+fn place_wall(
+    mouse_button_inputs: Res<Input<MouseButton>>,
+    pick_state: Res<PickState>,
+    squares_query: Query<&Square>,
+    commands: &mut Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    if !mouse_button_inputs.just_pressed(MouseButton::Right) {
+        return;
+    }
+
+    if let Some((square_entity, _intersection)) = pick_state.top(Group::default()) {
+        if let Ok(square) = squares_query.get(*square_entity) {
+            commands.spawn(PbrBundle {
+                mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
+                material: materials.add(Color::GRAY.into()),
+                transform: Transform::from_translation(Vec3::new(
+                    square.x as f32,
+                    0.5,
+                    square.y as f32,
+                )),
+                ..Default::default()
+            });
+        }
     }
 }

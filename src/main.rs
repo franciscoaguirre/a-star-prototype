@@ -21,9 +21,7 @@ fn main() {
         .run();
 }
 
-fn setup(
-    commands: &mut Commands
-) {
+fn setup(commands: &mut Commands) {
     let camera_translation = Vec3::new(
         GRID_WIDTH as f32 * TILE_SIZE * 0.5,
         15.0,
