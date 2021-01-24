@@ -11,7 +11,11 @@ impl Plugin for GridPlugin {
         app.init_resource::<SquareMaterials>()
             .init_resource::<SelectedSquare>()
             .init_resource::<SelectedPath>()
-            .add_startup_system(create_grid.system())
+            .add_startup_stage("game_setup", SystemStage::serial())
+            // .add_startup_system(create_grid.system())
+            .add_startup_system_to_stage("game_setup", create_grid.system())
+            .add_startup_system_to_stage("game_setup", calculate_startup_adjacents.system())
+            .add_event::<UpdateAdjacentsEvent>()
             .add_system(color_squares.system())
             .add_system(select_square.system())
             .add_system(place_wall.system());
@@ -34,12 +38,35 @@ pub struct Square {
     pub x: i32,
     pub y: i32,
     pub obstructed: bool,
+    pub unobstructed_adjacents: Vec<Entity>,
+    pub adjacents: Vec<Entity>,
 }
 
 impl Square {
     fn is_white(&self) -> bool {
         (self.x + self.y) % 2 == 0
     }
+
+    // fn adjacents(&self) -> Vec<&Square> {
+    //     self.adjacents
+    //         .iter()
+    //         .filter(|square| !square.obstructed)
+    //         .map(|square| *square)
+    //         .collect()
+    // }
+
+    fn adjacents_numbers(&self) -> Vec<(i32, i32)> {
+        vec![
+            (self.x, self.y + 1),
+            (self.x, self.y - 1),
+            (self.x + 1, self.y),
+            (self.x - 1, self.y),
+        ]
+    }
+}
+
+struct UpdateAdjacentsEvent {
+    square: Entity,
 }
 
 struct SquareMaterials {
@@ -62,11 +89,52 @@ impl FromResources for SquareMaterials {
     }
 }
 
+fn calculate_startup_adjacents(
+    mut query: Query<&mut Square>,
+    // adjacent_squares: Query<(Entity, &Square)>,
+) {
+    println!("Calculating grid adjacency...");
+    // println!("{:?}", query.iter_mut().collect::<Vec<_>>());
+    for mut square in query.iter_mut() {
+        // for (entity, adjacent) in adjacent_squares.iter() {
+        //     if square
+        //         .adjacents_numbers()
+        //         .contains(&(adjacent.x, adjacent.y))
+        //     {
+        //         square.adjacents.push(entity);
+        //     }
+        // }
+
+        println!(
+            "x: {:?} y: {:?} adj: {:?}",
+            square.x,
+            square.y,
+            0 //, square.adjacents
+        );
+    }
+    println!("Finished adjacency");
+}
+
+fn adjust_adjacents(
+    events: Res<Events<UpdateAdjacentsEvent>>,
+    mut event_reader: Local<EventReader<UpdateAdjacentsEvent>>,
+    query: Query<&Square>,
+) {
+    for event in event_reader.iter(&events) {
+        let square = query.get(event.square).unwrap();
+
+        // for adjacent in square.adjacents {}
+    }
+}
+
 fn create_grid(
     commands: &mut Commands,
     square_materials: Res<SquareMaterials>,
     mut meshes: ResMut<Assets<Mesh>>,
+    // mut query: Query<&mut Square>,
+    // adjacent_squares: Query<(Entity, &Square)>,
 ) {
+    println!("Creating grid...");
     for row in 0..GRID_HEIGHT {
         for column in 0..GRID_WIDTH {
             let material = if (row + column) % 2 == 0 {
@@ -94,6 +162,8 @@ fn create_grid(
                 .with(PickableMesh::default());
         }
     }
+    println!("Finished grid");
+    // calculate_startup_adjacents(query);//, adjacent_squares);
 }
 
 fn color_squares(
@@ -155,8 +225,8 @@ fn select_square(
 fn place_wall(
     mouse_button_inputs: Res<Input<MouseButton>>,
     pick_state: Res<PickState>,
-    squares_query: Query<&Square>,
     commands: &mut Commands,
+    mut squares_query: Query<&mut Square>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
@@ -165,7 +235,7 @@ fn place_wall(
     }
 
     if let Some((square_entity, _intersection)) = pick_state.top(Group::default()) {
-        if let Ok(square) = squares_query.get(*square_entity) {
+        if let Ok(mut square) = squares_query.get_mut(*square_entity) {
             commands.spawn(PbrBundle {
                 mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
                 material: materials.add(Color::GRAY.into()),
@@ -176,6 +246,8 @@ fn place_wall(
                 )),
                 ..Default::default()
             });
+
+            square.obstructed = true;
         }
     }
 }
